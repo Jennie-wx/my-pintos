@@ -1,5 +1,3 @@
-/* Tests timer_sleep(-100).  Only requirement is that it not crash. */
-
 #include <stdio.h>
 #include "tests/threads/tests.h"
 #include "threads/malloc.h"
@@ -8,8 +6,8 @@
 #include "devices/timer.h"
 
 void
-test_alarm_negative (void) 
+test_stride_one (void)
 {
-  timer_sleep (-100);
+//  timer_sleep (0);
   pass ();
 }

@@ -3,8 +3,8 @@ use strict;
 use warnings;
 use tests::tests;
 check_expected ([<<'EOF']);
-(alarm-negative) begin
-(alarm-negative) PASS
-(alarm-negative) end
+(stride-one) begin
+(stride-one) PASS
+(stride-one) end
 EOF
 pass;
