@@ -1,3 +1,25 @@
+/*思路：：：
+先要轮流使用cpu时间
+
+覆盖时间片轮转的方法
+使用stride scheduling调度算法
+ 每个runnable进程设置一个stride表示调度权
+ pass为累加值
+
+
+
+初始化运行队列使当前运行队列中进程为0
+
+入队函数增加stride属性，
+出队函数运行项目-1。
+
+调度函数 扫描整个队列，选择stride最小的
+
+时间片函数检查是否已用完分配的时间片，
+优先队列的比较函数主要思路为步数相减来比较大小。
+*/
+
+
 #include "threads/thread.h"
 #include <debug.h>
 #include <stddef.h>
@@ -19,11 +41,12 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
+#define fp_one (1<<14) //表示浮点数1.0
 static int load_avg;
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
-
+bool thread_mlfqs;
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -186,7 +209,11 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
+  struct thread *cur_t = thread_current();
+  t->stride = cur_t->stride;
+  t->pass = cur_t->pass;//
   tid = t->tid = allocate_tid ();
+  t->ticks_sleep = 0;
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -343,6 +370,33 @@ thread_set_priority (int new_priority)
   thread_current ()->priority = new_priority;
 }
 
+void
+thread_recalculate_priority(struct thread *t,void *aux UNUSED)//每4个ticks都需要对所有线程重新计算优先级
+{
+  if(t==idle_thread)
+    return;
+  t->pass=BIG_STRIDE/t->priority;
+  if(t->priority > PRI_MAX)
+    t->priority = PRI_MAX;
+  if(t->priority < PRI_MIN)
+    t->priority = PRI_MIN;
+}
+
+
+void
+thread_set_stride (int stride) 
+{
+  struct thread *t = thread_current();
+  t->stride = stride;
+  thread_recalculate_priority(t,NULL);
+  thread_yield();
+}
+
+int
+thread_get_stride (void) 
+{
+  return thread_current()->stride;
+}
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
@@ -352,7 +406,7 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_stride (int nice UNUSED) 
 {
   /* Not yet implemented. */
 }
@@ -362,7 +416,7 @@ int
 thread_get_nice (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -370,7 +424,13 @@ int
 thread_get_load_avg (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  int avg = load_avg;
+  if(avg>=0)
+    avg = (avg+fp_one/2)/fp_one;
+  else
+    avg = (avg-fp_one/2)/fp_one;
+  return avg*100;
+  
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
@@ -378,7 +438,12 @@ int
 thread_get_recent_cpu (void) 
 {
   /* Not yet implemented. */
-  return 0;
+  int cpu = thread_current()->recent_cpu;
+  if(cpu>=0)
+    cpu = (cpu+fp_one/2)/fp_one;
+  else
+    cpu = (cpu-fp_one/2)/fp_one;
+  return cpu*100;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -468,6 +533,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  if(!thread_mlfqs)
+  t->base_priority = priority;
+  t->stride = 0;
+  t->pass = 0;
+  list_init (&t->locks);
+  t->lock_waiting = NULL;
+
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

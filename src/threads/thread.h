@@ -93,6 +93,12 @@ struct thread
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    int64_t ticks_sleep;
+    int base_priority;                  /* 原始优先级 */
+    struct list locks;                  /* 线程拥有的锁 */
+    struct lock *lock_waiting;          /* 线程请求的锁*/
+    int nice;                           /* Niceness. */
+    int recent_cpu; 
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -135,6 +141,15 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_update_priority (struct thread *t);
+void thread_donate_priority (struct thread *t);
+void thread_remove_lock (struct lock *lock);
+/*为了计算线程优先级*/
+void thread_increase_recent_cpu(void);
+void thread_recalculate_load_avg(void);
+void thread_recalculate_recent_cpu(struct thread *t,void *);
+void thread_recalculate_priority(struct thread *t,void *);
+
 
 int thread_get_nice (void);
 void thread_set_nice (int);
