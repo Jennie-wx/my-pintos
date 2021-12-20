@@ -43,6 +43,7 @@
 #define THREAD_MAGIC 0xcd6abf4b
 #define fp_one (1<<14) //表示浮点数1.0
 static int load_avg;
+static int Ppass;
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
@@ -114,7 +115,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   BIG_STRIDE = 0xffff;
-
+  BIG_Ppass=0;
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
@@ -211,7 +212,7 @@ thread_create (const char *name, int priority,
   init_thread (t, name, priority);
   struct thread *cur_t = thread_current();
   t->stride = cur_t->stride;
-  t->pass = cur_t->pass;//
+  t->Ppass = cur_t->Ppass;//
   tid = t->tid = allocate_tid ();
   t->ticks_sleep = 0;
 
@@ -375,11 +376,27 @@ thread_recalculate_priority(struct thread *t,void *aux UNUSED)//每4个ticks都�
 {
   if(t==idle_thread)
     return;
-  t->pass=BIG_STRIDE/t->priority;
+  t->Ppass=BIG_STRIDE/t->priority;
   if(t->priority > PRI_MAX)
     t->priority = PRI_MAX;
   if(t->priority < PRI_MIN)
     t->priority = PRI_MIN;
+}
+
+void
+thread_Ppass(void)//每一个tick都需要更新当前线程的pass
+{
+  struct thread *t = thread_current();
+  t->Ppass = t->Ppass + fp_one;//浮点加1
+}
+
+void
+thread_recalculate_load_avg(void)//每秒都需要更新全局变量load_avg
+{
+  int size=list_size(&ready_list);
+  if(thread_current()!=idle_thread)
+    size++;
+  load_avg = load_avg*59/60 + (size)*fp_one/60;
 }
 
 
@@ -536,7 +553,7 @@ init_thread (struct thread *t, const char *name, int priority)
   if(!thread_mlfqs)
   t->base_priority = priority;
   t->stride = 0;
-  t->pass = 0;
+  t->Ppass = 0;
   list_init (&t->locks);
   t->lock_waiting = NULL;
 
