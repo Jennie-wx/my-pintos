@@ -115,7 +115,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
 
   BIG_STRIDE = 0xffff;
-  BIG_Ppass=0;
+
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
